@@ -18,7 +18,7 @@ Read about it online.
 import os
 from sqlalchemy import *
 from sqlalchemy.pool import NullPool
-from flask import Flask, request, render_template, g, redirect, Response
+from flask import Flask, request, render_template, g, redirect, Response, session
 
 tmpl_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'templates')
 app = Flask(__name__, template_folder=tmpl_dir)
@@ -122,10 +122,24 @@ def index():
     #
     # example of a database query
     #
-    cursor = g.conn.execute("SELECT name FROM test")
+    cursor = g.conn.execute("SELECT name, uid from users WHERE users.uid != 'ap0001' AND users.uid not in (SELECT uid2 from isFriendsWith where uid1 = 'ap0001')")
     names = []
+    uids = {}
     for result in cursor:
-      names.append(result['name'])  # can also be accessed using result[0]
+      names.append(result['name'])
+      uids[result['name']] = result['uid']
+    cursor.close()
+
+    cursor = g.conn.execute("SELECT name from users, isFriendsWith WHERE users.uid = isFriendsWith.uid2 AND isFriendsWith.uid1 = 'ap0001'")
+    friends = []
+    for result in cursor:
+      friends.append(result['name'])
+    cursor.close()
+
+    cursor = g.conn.execute("SELECT name from groups, isPartOf WHERE groups.gid = isPartOf.gid AND isPartOf.uid = 'ap0001'")
+    groups = []
+    for result in cursor:
+      groups.append(result['name'])
     cursor.close()
 
     #
@@ -154,8 +168,7 @@ def index():
     #     <div>{{n}}</div>
     #     {% endfor %}
     #
-    context = dict(data = names)
-
+    context = dict(names = names, uids = uids, friends = friends, groups = groups)
 
     #
     # render_template looks in the templates/ folder for files.
@@ -173,16 +186,42 @@ def index():
 #
 @app.route('/another')
 def another():
-  return render_template("anotherfile.html")
+  cursor = g.conn.execute("SELECT name, gid from groups WHERE groups.gid not in (select gid from isPartOf where uid = 'ap0001')")
+  names = []
+  gids = {}
+  for result in cursor:
+    names.append(result['name'])
+    gids[result['name']] = result['gid']
+  cursor.close()
+
+  cursor = g.conn.execute("SELECT title FROM ads")
+  titles = []
+  for result in cursor:
+    titles.append(result['title'])  # can also be accessed using result[0]
+  cursor.close()
+
+
+  context = dict(data = names, gids = gids, ads = titles)
+
+  return render_template("anotherfile.html", **context)
 
 
 # Example of adding new data to the database
 @app.route('/add', methods=['POST'])
 def add():
-  name = request.form['name']
-  print name
-  cmd = 'INSERT INTO test(name) VALUES (:name1), (:name2)';
-  g.conn.execute(text(cmd), name1 = name, name2 = name);
+  uid = request.form['uid']
+  print uid
+  cmd = 'INSERT INTO isFriendsWith(uid1, uid2) VALUES (\'ap0001\', :uid)';
+  g.conn.execute(text(cmd), uid = uid);
+  return redirect('/')
+
+
+@app.route('/join', methods=['POST'])
+def join():
+  gid = request.form['gid']
+  print gid
+  cmd = 'INSERT INTO isPartOf(gid, uid) VALUES (:gid, \'ap0001\')'
+  g.conn.execute(text(cmd), gid = gid);
   return redirect('/')
 
 
@@ -197,6 +236,7 @@ def do_admin_login():
 
 if __name__ == "__main__":
   import click
+  app.secret_key = os.urandom(12)
 
   @click.command()
   @click.option('--debug', is_flag=True)

@@ -1,1 +1,30 @@
-hello, I am another file!
+<div>
+  <h1><b>Groups</b></h1>
+
+
+<form method="POST" action="/join">
+  <div>
+    <b>Find Groups:</b>
+    <select name="gid">
+      <option value="Choose a group"/>
+      {% for n in data %}
+      <option value={{gids[n]}}>
+        {{n}}
+      </option>
+      {% endfor %}
+    </select>
+    <input type="submit" value="Join">
+  </div>
+  <div>
+</form>
+
+</br>
+<div>
+  <b>Ads</b>
+  {% for n in ads %}
+  <div>{{n}}</div>
+  {% endfor %}
+</div>  
+  
+  <p><a href="/">Back</a></p>
+</div>
